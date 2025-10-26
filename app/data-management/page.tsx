@@ -136,7 +136,7 @@ export default function DataManagementPage() {
         setLastSyncTime(new Date());
         loadData();
       } else {
-        toast.error(result.error);
+        toast.error('error' in result ? result.error : '同步失败');
       }
     } catch (error) {
       toast.error('同步失败');
