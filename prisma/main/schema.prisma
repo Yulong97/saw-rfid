@@ -17,6 +17,7 @@ model SAW_Item {
   description String?
   type_id Int?
   DesignParameter Json?  
+  Fabrication_date  DateTime? 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   isActive Boolean @default(true)
@@ -32,4 +33,16 @@ model SAW_Type {
   updatedAt DateTime @updatedAt
   isActive Boolean @default(true)
   SAW_Items SAW_Item[]
+}
+
+// Data Management table
+model data_management {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  file_path_relative String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isActive    Boolean  @default(true)
 }
