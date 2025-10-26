@@ -60,9 +60,13 @@ const items = [
   },
   {
     title: "数据管理",
-    url: "/data",
+    url: "/data-management",
     icon: Database,
     subitems: [
+      {
+        title: "文件管理",
+        url: "/data-management",
+      },
       {
         title: "数据集管理",
         url: "/data/datasets",
