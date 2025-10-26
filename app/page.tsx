@@ -85,13 +85,13 @@ export default function Home() {
     ]);
 
     if (typesResult.success) {
-      setTypes(typesResult.data);
+      setTypes(typesResult.data || []);
     } else {
       toast.error(typesResult.error);
     }
 
     if (itemsResult.success) {
-      setItems(itemsResult.data);
+      setItems(itemsResult.data || []);
     } else {
       toast.error(itemsResult.error);
     }
