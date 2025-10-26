@@ -1,0 +1,35 @@
+// Prisma schema for Main Database
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/@prisma/client-main"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("MAIN_DATABASE_URL")
+}
+
+// SAW Item table
+model SAW_Item {
+  id        Int      @id @default(autoincrement())
+  name      String?
+  description String?
+  type_id Int?
+  DesignParameter Json?  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive Boolean @default(true)
+  type SAW_Type? @relation(fields: [type_id], references: [id])
+}
+
+// SAW type table
+model SAW_Type {
+  id        Int      @id @default(autoincrement())
+  name      String
+  description String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive Boolean @default(true)
+  SAW_Items SAW_Item[]
+}
