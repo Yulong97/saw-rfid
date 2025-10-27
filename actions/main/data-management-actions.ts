@@ -650,3 +650,228 @@ export async function getFileDownloadUrl(recordId: number) {
     return { success: false, error: 'Failed to get download URL' };
   }
 }
+
+// 获取文件预览信息
+export async function getFilePreviewInfo(recordId: number) {
+  try {
+    const record = await prismaMain.data_management.findUnique({
+      where: { id: recordId },
+    });
+
+    if (!record || !record.file_path_relative) {
+      return { success: false, error: 'Record or file path not found' };
+    }
+
+    const fullPath = path.join(RAW_DATA_FULL_PATH, record.file_path_relative.replace('test/', ''));
+    
+    if (!fs.existsSync(fullPath)) {
+      return { success: false, error: 'File does not exist' };
+    }
+
+    const stats = fs.statSync(fullPath);
+    const extension = path.extname(fullPath).toLowerCase();
+    const fileName = record.title || path.basename(fullPath);
+
+    // 支持预览的文件类型
+    const PREVIEWABLE_TYPES = {
+      text: ['.txt', '.csv', '.json', '.xml', '.log', '.md'],
+      image: ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.webp'],
+      video: ['.mp4', '.avi', '.mov', '.webm'],
+      audio: ['.mp3', '.wav', '.ogg', '.m4a'],
+      pdf: ['.pdf'],
+      code: ['.js', '.ts', '.jsx', '.tsx', '.css', '.scss', '.html', '.py', '.java', '.cpp', '.c', '.php', '.rb', '.go', '.rs']
+    };
+
+    // 获取文件类型
+    let fileType = 'unknown';
+    for (const [type, extensions] of Object.entries(PREVIEWABLE_TYPES)) {
+      if (extensions.includes(extension)) {
+        fileType = type;
+        break;
+      }
+    }
+
+    const isPreviewable = Object.values(PREVIEWABLE_TYPES).flat().includes(extension);
+
+    return {
+      success: true,
+      data: {
+        id: record.id,
+        fileName,
+        fileSize: stats.size,
+        fileType,
+        extension,
+        isPreviewable,
+        mimeType: getMimeType(extension),
+        lastModified: stats.mtime,
+        createdAt: stats.birthtime,
+        relativePath: record.file_path_relative,
+        description: record.description,
+      }
+    };
+  } catch (error) {
+    console.error('Error getting file preview info:', error);
+    return { success: false, error: 'Failed to get file preview info' };
+  }
+}
+
+// 获取文件预览内容
+export async function getFilePreviewContent(recordId: number) {
+  try {
+    const record = await prismaMain.data_management.findUnique({
+      where: { id: recordId },
+    });
+
+    if (!record || !record.file_path_relative) {
+      return { success: false, error: 'Record or file path not found' };
+    }
+
+    const fullPath = path.join(RAW_DATA_FULL_PATH, record.file_path_relative.replace('test/', ''));
+    
+    if (!fs.existsSync(fullPath)) {
+      return { success: false, error: 'File does not exist' };
+    }
+
+    const extension = path.extname(fullPath).toLowerCase();
+    const fileName = record.title || path.basename(fullPath);
+
+    // 支持预览的文件类型
+    const PREVIEWABLE_TYPES = {
+      text: ['.txt', '.csv', '.json', '.xml', '.log', '.md'],
+      image: ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.webp'],
+      video: ['.mp4', '.avi', '.mov', '.webm'],
+      audio: ['.mp3', '.wav', '.ogg', '.m4a'],
+      pdf: ['.pdf'],
+      code: ['.js', '.ts', '.jsx', '.tsx', '.css', '.scss', '.html', '.py', '.java', '.cpp', '.c', '.php', '.rb', '.go', '.rs']
+    };
+
+    // 获取文件类型
+    let fileType = 'unknown';
+    for (const [type, extensions] of Object.entries(PREVIEWABLE_TYPES)) {
+      if (extensions.includes(extension)) {
+        fileType = type;
+        break;
+      }
+    }
+
+    const isPreviewable = Object.values(PREVIEWABLE_TYPES).flat().includes(extension);
+
+    if (!isPreviewable) {
+      return { success: false, error: 'File type not supported for preview' };
+    }
+
+    // 获取文件内容
+    const content = await getFileContentForPreview(fullPath, fileType, extension, recordId);
+
+    return {
+      success: true,
+      data: {
+        fileName,
+        fileType,
+        extension,
+        content,
+        mimeType: getMimeType(extension),
+      }
+    };
+  } catch (error) {
+    console.error('Error getting file preview content:', error);
+    return { success: false, error: 'Failed to get file preview content' };
+  }
+}
+
+// 获取文件内容用于预览
+async function getFileContentForPreview(filePath: string, fileType: string, extension: string, recordId: number): Promise<any> {
+  try {
+    switch (fileType) {
+      case 'text':
+      case 'code':
+        // 读取文本文件内容
+        const textContent = fs.readFileSync(filePath, 'utf-8');
+        return {
+          type: 'text',
+          content: textContent,
+          lines: textContent.split('\n').length,
+          encoding: 'utf-8'
+        };
+
+      case 'image':
+        // 对于图片，返回base64编码
+        const imageBuffer = fs.readFileSync(filePath);
+        const base64Image = imageBuffer.toString('base64');
+        return {
+          type: 'image',
+          content: `data:${getMimeType(extension)};base64,${base64Image}`,
+          size: imageBuffer.length
+        };
+
+      case 'json':
+        // 解析JSON文件
+        const jsonContent = fs.readFileSync(filePath, 'utf-8');
+        const parsedJson = JSON.parse(jsonContent);
+        return {
+          type: 'json',
+          content: parsedJson,
+          raw: jsonContent,
+          formatted: JSON.stringify(parsedJson, null, 2)
+        };
+
+      case 'csv':
+        // 解析CSV文件
+        const csvContent = fs.readFileSync(filePath, 'utf-8');
+        const lines = csvContent.split('\n').filter(line => line.trim());
+        const headers = lines[0]?.split(',') || [];
+        const rows = lines.slice(1).map(line => line.split(','));
+        return {
+          type: 'csv',
+          content: { headers, rows },
+          raw: csvContent,
+          totalRows: rows.length
+        };
+
+      case 'pdf':
+        // 对于PDF文件，返回base64编码用于预览
+        const pdfBuffer = fs.readFileSync(filePath);
+        const base64Pdf = pdfBuffer.toString('base64');
+        return {
+          type: 'pdf',
+          content: `data:${getMimeType(extension)};base64,${base64Pdf}`,
+          size: pdfBuffer.length,
+          fileName: path.basename(filePath)
+        };
+
+      case 'video':
+        // 对于视频文件，返回流式API URL用于预览
+        return {
+          type: 'video',
+          content: `/api/stream?id=${recordId}`,
+          size: fs.statSync(filePath).size,
+          fileName: path.basename(filePath),
+          mimeType: getMimeType(extension)
+        };
+
+      case 'audio':
+        // 对于音频文件，返回流式API URL用于预览
+        return {
+          type: 'audio',
+          content: `/api/stream?id=${recordId}`,
+          size: fs.statSync(filePath).size,
+          fileName: path.basename(filePath),
+          mimeType: getMimeType(extension)
+        };
+
+      default:
+        return {
+          type: 'unknown',
+          content: null,
+          message: 'File type not supported for preview'
+        };
+    }
+  } catch (error) {
+    console.error('Error reading file content:', error);
+    return {
+      type: 'error',
+      content: null,
+      error: 'Failed to read file content'
+    };
+  }
+}

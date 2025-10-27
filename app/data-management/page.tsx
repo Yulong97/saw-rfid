@@ -55,8 +55,10 @@ import {
   Upload,
   X,
   CheckSquare,
-  Square
+  Square,
+  FileSearch
 } from 'lucide-react';
+import FilePreview from '@/components/file-preview';
 
 interface DataManagementRecord {
   id: number;
@@ -92,6 +94,10 @@ export default function DataManagementPage() {
   // 下载状态
   const [selectedRecords, setSelectedRecords] = useState<number[]>([]);
   const [downloading, setDownloading] = useState(false);
+
+  // 预览状态
+  const [previewRecord, setPreviewRecord] = useState<DataManagementRecord | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // 同步状态
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
@@ -221,6 +227,18 @@ export default function DataManagementPage() {
     } else {
       toast.error(result.error);
     }
+  };
+
+  // 预览文件
+  const handlePreviewFile = (record: DataManagementRecord) => {
+    setPreviewRecord(record);
+    setPreviewOpen(true);
+  };
+
+  // 关闭预览
+  const handleClosePreview = () => {
+    setPreviewOpen(false);
+    setPreviewRecord(null);
   };
 
   // 处理文件选择
@@ -707,6 +725,16 @@ export default function DataManagementPage() {
                         <Button
                           variant="outline"
                           size="icon"
+                          onClick={() => handlePreviewFile(record)}
+                          title="预览文件"
+                        >
+                          <FileSearch className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {record.file_path_relative && (
+                        <Button
+                          variant="outline"
+                          size="icon"
                           onClick={() => handleDownloadSingle(record.id)}
                           disabled={downloading}
                           title="下载文件"
@@ -773,6 +801,16 @@ export default function DataManagementPage() {
           </>
         )}
       </div>
+
+      {/* 文件预览对话框 */}
+      {previewRecord && (
+        <FilePreview
+          recordId={previewRecord.id}
+          fileName={previewRecord.title}
+          isOpen={previewOpen}
+          onClose={handleClosePreview}
+        />
+      )}
     </div>
   );
 }
