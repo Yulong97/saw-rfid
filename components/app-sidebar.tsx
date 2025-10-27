@@ -1,4 +1,4 @@
-import { Calendar, Home, Contact, Search, Settings, Database, ChevronRight, MapPin, Activity, BookOpen, Users, FlaskConical, Calculator } from "lucide-react"
+import { Calendar, Home, Contact, Search, Settings, Database, ChevronRight,   BookOpen, FlaskConical, Calculator, StickyNote } from "lucide-react"
 import Link from "next/link"
 
 import {
@@ -78,6 +78,25 @@ const items = [
       {
         title: "备份恢复",
         url: "/data/backup",
+      },
+    ],
+  },
+  {
+    title: "笔记管理",
+    url: "/obsidian-notes",
+    icon: StickyNote,
+    subitems: [
+      {
+        title: "笔记浏览",
+        url: "/obsidian-notes",
+      },
+      {
+        title: "标签管理",
+        url: "/obsidian-notes/tags",
+      },
+      {
+        title: "搜索笔记",
+        url: "/obsidian-notes/search",
       },
     ],
   },
