@@ -1,5 +1,5 @@
 # Prisma + SQLite 多数据库配置指南
-
+（下面的具体的数据只是例子）
 ## 一、安装依赖
 
 ```bash
@@ -64,14 +64,20 @@ model SAW_Type {
 **文件：`.env`**
 
 ```env
-MAIN_DATABASE_URL="file:C:/Users/YOUR_USERNAME/OneDrive/001shared/saw-rfid-project/databases/main.db"
+ONEDRIVE_BASE_PATH="C:/Users/YOUR_USERNAME/OneDrive"
 ```
 
 **文件：`.env.example`**
 
 ```env
-MAIN_DATABASE_URL="file:C:/Users/YOUR_USERNAME/OneDrive/001shared/saw-rfid-project/databases/main.db"
+ONEDRIVE_BASE_PATH="C:/Users/YOUR_USERNAME/OneDrive"
 ```
+
+**说明：**
+- 只需要配置 `ONEDRIVE_BASE_PATH`
+- `MAIN_DATABASE_URL` 会自动组合为：`file:{ONEDRIVE_BASE_PATH}/001shared/saw-rfid-project/databases/main.db`
+- `RAW_DATA_BASE_PATH` 会自动设置为 `ONEDRIVE_BASE_PATH` 的值
+- 其他路径都会在代码运行时自动生成，不需要在 `.env` 文件中配置
 
 ### 4. 创建 OneDrive 文件夹
 
@@ -92,6 +98,13 @@ npx prisma migrate dev --name init --schema=./prisma/main/schema.prisma
 ```typescript
 import { PrismaClient } from '@prisma/client-main';
 
+// Auto-generate database paths from base OneDrive path
+if (process.env.ONEDRIVE_BASE_PATH) {
+  const basePath = process.env.ONEDRIVE_BASE_PATH;
+  process.env.MAIN_DATABASE_URL = `file:${basePath}/001shared/saw-rfid-project/databases/main.db`;
+  process.env.RAW_DATA_BASE_PATH = basePath;
+}
+
 const globalForPrisma = globalThis as unknown as {
   prismaMain: PrismaClient | undefined;
 };
@@ -108,6 +121,10 @@ export async function disconnectMainDb() {
   await prismaMain.$disconnect();
 }
 ```
+
+**说明：**
+- 在创建 PrismaClient 之前，会自动从 `ONEDRIVE_BASE_PATH` 组合生成完整的数据库路径
+- 这样每台电脑只需要配置 `ONEDRIVE_BASE_PATH`，其他路径自动生成
 
 ### 7. 创建 Server Actions
 
@@ -193,11 +210,9 @@ model Inventory {
 
 ### 3. 添加环境变量
 
-**在 `.env` 中添加：**
+**无需添加**（会自动从 `ONEDRIVE_BASE_PATH` 生成）
 
-```env
-WAREHOUSE_DATABASE_URL="file:C:/Users/YOUR_USERNAME/OneDrive/001shared/saw-rfid-project/databases/warehouse.db"
-```
+如果需要，可以在 `lib/prisma/warehouse.ts` 中添加类似的路径生成逻辑
 
 ### 4. 执行迁移
 
@@ -266,7 +281,7 @@ npx prisma migrate reset --schema=./prisma/main/schema.prisma
 1. 克隆项目
 2. `npm install`
 3. 复制 `.env.example` 到 `.env`
-4. 修改 `.env` 中的用户名路径
+4. 修改 `.env` 中的 `ONEDRIVE_BASE_PATH`（将 YOUR_USERNAME 改为实际用户名）
 5. 等待 OneDrive 同步数据库文件
 6. `npx prisma generate --schema=./prisma/main/schema.prisma`
 

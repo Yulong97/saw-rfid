@@ -3,7 +3,9 @@ import { prismaMain } from '@/lib/prisma/main';
 import fs from 'fs';
 import path from 'path';
 
-const RAW_DATA_BASE_PATH = process.env.RAW_DATA_BASE_PATH || 'C:\\Users\\Yulong_Lab\\OneDrive';
+// Auto-generate base path from ONEDRIVE_BASE_PATH
+const ONEDRIVE_BASE_PATH = process.env.ONEDRIVE_BASE_PATH || process.env.RAW_DATA_BASE_PATH || 'C:\\Users\\Yulong_Lab\\OneDrive';
+const RAW_DATA_BASE_PATH = ONEDRIVE_BASE_PATH;
 const RAW_DATA_RELATIVE_PATH = '001shared/saw-rfid-project/raw_data/test';
 const RAW_DATA_FULL_PATH = path.join(RAW_DATA_BASE_PATH, RAW_DATA_RELATIVE_PATH);
 

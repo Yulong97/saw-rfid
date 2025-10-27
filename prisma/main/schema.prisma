@@ -1,4 +1,6 @@
 // Prisma schema for Main Database
+// Note: MAIN_DATABASE_URL is auto-generated from ONEDRIVE_BASE_PATH in lib/prisma/main.ts
+// You only need to set ONEDRIVE_BASE_PATH in .env file
 
 generator client {
   provider = "prisma-client-js"
