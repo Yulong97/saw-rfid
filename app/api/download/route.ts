@@ -3,7 +3,9 @@ import { prismaMain } from '@/lib/prisma/main';
 import fs from 'fs';
 import path from 'path';
 
-const RAW_DATA_BASE_PATH = 'C:\\Users\\Yulong_Lab\\OneDrive\\001shared\\saw-rfid-project\\raw_data\\test';
+const RAW_DATA_BASE_PATH = process.env.RAW_DATA_BASE_PATH || 'C:\\Users\\Yulong_Lab\\OneDrive';
+const RAW_DATA_RELATIVE_PATH = '001shared/saw-rfid-project/raw_data/test';
+const RAW_DATA_FULL_PATH = path.join(RAW_DATA_BASE_PATH, RAW_DATA_RELATIVE_PATH);
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 构建完整文件路径
-    const fullPath = path.join(RAW_DATA_BASE_PATH, record.file_path_relative.replace('test/', ''));
+    const fullPath = path.join(RAW_DATA_FULL_PATH, record.file_path_relative.replace('test/', ''));
     
     // 检查文件是否存在
     if (!fs.existsSync(fullPath)) {

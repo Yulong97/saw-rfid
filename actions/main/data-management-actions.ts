@@ -6,7 +6,9 @@ import fs from 'fs';
 import path from 'path';
 import { writeFile, readFile } from 'fs/promises';
 
-const RAW_DATA_BASE_PATH = 'C:\\Users\\Yulong_Lab\\OneDrive\\001shared\\saw-rfid-project\\raw_data\\test';
+const RAW_DATA_BASE_PATH = process.env.RAW_DATA_BASE_PATH || 'C:\\Users\\Yulong_Lab\\OneDrive';
+const RAW_DATA_RELATIVE_PATH = '001shared/saw-rfid-project/raw_data/test';
+const RAW_DATA_FULL_PATH = path.join(RAW_DATA_BASE_PATH, RAW_DATA_RELATIVE_PATH);
 
 // 获取所有数据管理记录
 export async function getDataManagementRecords() {
@@ -30,19 +32,19 @@ export async function getDataManagementRecords() {
 export async function scanAndSyncDataFiles() {
   try {
     // 检查目录是否存在
-    if (!fs.existsSync(RAW_DATA_BASE_PATH)) {
+    if (!fs.existsSync(RAW_DATA_FULL_PATH)) {
       return { success: false, error: 'Raw data directory does not exist' };
     }
 
     // 读取目录中的所有文件
-    const files = fs.readdirSync(RAW_DATA_BASE_PATH, { withFileTypes: true });
+    const files = fs.readdirSync(RAW_DATA_FULL_PATH, { withFileTypes: true });
     const fileList = files
       .filter(file => file.isFile())
       .map(file => ({
         name: file.name,
-        path: path.join(RAW_DATA_BASE_PATH, file.name),
+        path: path.join(RAW_DATA_FULL_PATH, file.name),
         relativePath: `test/${file.name}`,
-        stats: fs.statSync(path.join(RAW_DATA_BASE_PATH, file.name))
+        stats: fs.statSync(path.join(RAW_DATA_FULL_PATH, file.name))
       }));
 
     // 获取数据库中所有活跃的记录
@@ -143,7 +145,7 @@ export async function scanAndSyncDataFiles() {
 export async function incrementalSyncDataFiles(lastSyncTime?: Date) {
   try {
     // 检查目录是否存在
-    if (!fs.existsSync(RAW_DATA_BASE_PATH)) {
+    if (!fs.existsSync(RAW_DATA_FULL_PATH)) {
       return { success: false, error: 'Raw data directory does not exist' };
     }
 
@@ -153,11 +155,11 @@ export async function incrementalSyncDataFiles(lastSyncTime?: Date) {
     }
 
     // 读取目录中的所有文件
-    const files = fs.readdirSync(RAW_DATA_BASE_PATH, { withFileTypes: true });
+    const files = fs.readdirSync(RAW_DATA_FULL_PATH, { withFileTypes: true });
     const fileList = files
       .filter(file => file.isFile())
       .map(file => {
-        const filePath = path.join(RAW_DATA_BASE_PATH, file.name);
+        const filePath = path.join(RAW_DATA_FULL_PATH, file.name);
         const stats = fs.statSync(filePath);
         return {
           name: file.name,
@@ -223,7 +225,7 @@ export async function incrementalSyncDataFiles(lastSyncTime?: Date) {
 
     for (const record of allRecords) {
       if (record.file_path_relative) {
-        const fullPath = path.join(RAW_DATA_BASE_PATH, record.file_path_relative.replace('test/', ''));
+        const fullPath = path.join(RAW_DATA_FULL_PATH, record.file_path_relative.replace('test/', ''));
         if (!fs.existsSync(fullPath)) {
           const deletedRecord = await prismaMain.data_management.update({
             where: { id: record.id },
@@ -322,7 +324,7 @@ export async function deleteDataManagementRecord(id: number) {
 // 获取文件信息
 export async function getFileInfo(relativePath: string) {
   try {
-    const fullPath = path.join(RAW_DATA_BASE_PATH, relativePath);
+    const fullPath = path.join(RAW_DATA_FULL_PATH, relativePath);
     if (!fs.existsSync(fullPath)) {
       return { success: false, error: 'File does not exist' };
     }
@@ -358,8 +360,8 @@ export async function uploadFile(formData: FormData) {
     }
 
     // 确保目录存在
-    if (!fs.existsSync(RAW_DATA_BASE_PATH)) {
-      fs.mkdirSync(RAW_DATA_BASE_PATH, { recursive: true });
+    if (!fs.existsSync(RAW_DATA_FULL_PATH)) {
+      fs.mkdirSync(RAW_DATA_FULL_PATH, { recursive: true });
     }
 
     // 生成文件名（避免重复）
@@ -371,7 +373,7 @@ export async function uploadFile(formData: FormData) {
     
     // 构建文件路径
     const relativePath = `test/${fileName}`;
-    const fullPath = path.join(RAW_DATA_BASE_PATH, fileName);
+    const fullPath = path.join(RAW_DATA_FULL_PATH, fileName);
 
     // 将文件写入磁盘
     const bytes = await file.arrayBuffer();
@@ -415,8 +417,8 @@ export async function uploadMultipleFiles(formData: FormData) {
     }
 
     // 确保目录存在
-    if (!fs.existsSync(RAW_DATA_BASE_PATH)) {
-      fs.mkdirSync(RAW_DATA_BASE_PATH, { recursive: true });
+    if (!fs.existsSync(RAW_DATA_FULL_PATH)) {
+      fs.mkdirSync(RAW_DATA_FULL_PATH, { recursive: true });
     }
 
     for (const file of files) {
@@ -430,7 +432,7 @@ export async function uploadMultipleFiles(formData: FormData) {
         
         // 构建文件路径
         const relativePath = `test/${fileName}`;
-        const fullPath = path.join(RAW_DATA_BASE_PATH, fileName);
+        const fullPath = path.join(RAW_DATA_FULL_PATH, fileName);
 
         // 将文件写入磁盘
         const bytes = await file.arrayBuffer();
@@ -498,7 +500,7 @@ export async function downloadFile(recordId: number) {
     }
 
     // 构建完整文件路径
-    const fullPath = path.join(RAW_DATA_BASE_PATH, record.file_path_relative.replace('test/', ''));
+    const fullPath = path.join(RAW_DATA_FULL_PATH, record.file_path_relative.replace('test/', ''));
     
     // 检查文件是否存在
     if (!fs.existsSync(fullPath)) {
@@ -577,7 +579,7 @@ export async function downloadMultipleFiles(recordIds: number[]) {
         continue;
       }
 
-      const fullPath = path.join(RAW_DATA_BASE_PATH, record.file_path_relative.replace('test/', ''));
+      const fullPath = path.join(RAW_DATA_FULL_PATH, record.file_path_relative.replace('test/', ''));
       
       if (!fs.existsSync(fullPath)) {
         missingFiles.push(record.title || `Record ${record.id}`);
@@ -628,7 +630,7 @@ export async function getFileDownloadUrl(recordId: number) {
       return { success: false, error: 'Record or file path not found' };
     }
 
-    const fullPath = path.join(RAW_DATA_BASE_PATH, record.file_path_relative.replace('test/', ''));
+    const fullPath = path.join(RAW_DATA_FULL_PATH, record.file_path_relative.replace('test/', ''));
     
     if (!fs.existsSync(fullPath)) {
       return { success: false, error: 'File does not exist' };
