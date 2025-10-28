@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { getNoteByPath, type ObsidianNote } from '@/actions/main/obsidian-actions';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +33,7 @@ import 'katex/dist/katex.min.css';
 
 export default function NoteDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const [note, setNote] = useState<ObsidianNote | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -118,6 +119,26 @@ export default function NoteDetailPage() {
       });
   };
 
+  // 构建返回链接，保持搜索状态
+  const buildBackUrl = () => {
+    const searchQuery = searchParams.get('q');
+    const page = searchParams.get('page');
+    const pageSize = searchParams.get('pageSize');
+    
+    let backUrl = '/obsidian-notes';
+    const params = new URLSearchParams();
+    
+    if (searchQuery) params.set('q', searchQuery);
+    if (page) params.set('page', page);
+    if (pageSize) params.set('pageSize', pageSize);
+    
+    if (params.toString()) {
+      backUrl += '?' + params.toString();
+    }
+    
+    return backUrl;
+  };
+
   useEffect(() => {
     loadNote();
   }, [notePath]);
@@ -143,7 +164,7 @@ export default function NoteDetailPage() {
             The requested note could not be found.
           </p>
           <Button asChild>
-            <Link href="/obsidian-notes">
+            <Link href={buildBackUrl()}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Notes
             </Link>
@@ -160,7 +181,7 @@ export default function NoteDetailPage() {
       {/* 返回按钮 */}
       <div className="mb-6">
         <Button variant="outline" asChild>
-          <Link href="/obsidian-notes">
+          <Link href={buildBackUrl()}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Notes
           </Link>
