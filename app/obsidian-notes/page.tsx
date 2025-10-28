@@ -20,6 +20,7 @@ import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import { BreadcrumbNav, breadcrumbConfigs } from '@/components/breadcrumb-nav';
 
 export default function ObsidianNotesPage() {
   const searchParams = useSearchParams();
@@ -286,6 +287,9 @@ export default function ObsidianNotesPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-8">
+      {/* 面包屑导航 */}
+      <BreadcrumbNav items={breadcrumbConfigs.obsidianNotes} />
+
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold mb-2">Obsidian Notes</h1>

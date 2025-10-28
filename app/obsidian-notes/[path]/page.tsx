@@ -30,6 +30,7 @@ import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import { BreadcrumbNav, breadcrumbConfigs } from '@/components/breadcrumb-nav';
 
 export default function NoteDetailPage() {
   const params = useParams();
@@ -201,6 +202,12 @@ export default function NoteDetailPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
+      {/* 面包屑导航 */}
+      <BreadcrumbNav 
+        items={breadcrumbConfigs.noteDetail(note.title, buildBackUrl())} 
+        className="mb-6" 
+      />
+
       {/* 返回按钮 */}
       <div className="mb-6">
         <Button variant="outline" asChild>

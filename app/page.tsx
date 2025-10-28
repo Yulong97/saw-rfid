@@ -37,6 +37,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Trash2, Plus } from 'lucide-react';
+import { BreadcrumbNav, breadcrumbConfigs } from '@/components/breadcrumb-nav';
 
 interface SAWType {
   id: number;
@@ -184,6 +185,9 @@ export default function Home() {
 
   return (
     <div className="container mx-auto p-6 space-y-8">
+      {/* 面包屑导航 */}
+      <BreadcrumbNav items={breadcrumbConfigs.home} />
+
       <div>
         <h1 className="text-3xl font-bold mb-2">SAW RFID 系统 - 测试页面</h1>
         <p className="text-muted-foreground">
