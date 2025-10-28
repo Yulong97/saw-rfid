@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAllNotes, type ObsidianNote } from '@/actions/main/obsidian-actions';
+import { getAllNotes, getAllFolders, getNotesByFolder, type ObsidianNote } from '@/actions/main/obsidian-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, ArrowLeft, RefreshCw, Folder } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NoteSearchPage() {
@@ -14,6 +15,8 @@ export default function NoteSearchPage() {
   const [filteredNotes, setFilteredNotes] = useState<ObsidianNote[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [folders, setFolders] = useState<string[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState('all');
 
   // 加载所有笔记
   const loadNotes = async () => {
@@ -28,6 +31,18 @@ export default function NoteSearchPage() {
       console.error('Error loading notes:', error);
     }
     setLoading(false);
+  };
+
+  // 加载文件夹列表
+  const loadFolders = async () => {
+    try {
+      const result = await getAllFolders();
+      if (result.success && result.data) {
+        setFolders(result.data);
+      }
+    } catch (error) {
+      console.error('Error loading folders:', error);
+    }
   };
 
   // 搜索功能
@@ -48,8 +63,36 @@ export default function NoteSearchPage() {
     setFilteredNotes(filtered);
   };
 
+  // 文件夹筛选功能
+  const handleFolderChange = (folder: string) => {
+    setSelectedFolder(folder);
+    
+    let filtered = notes;
+    
+    // 先按文件夹筛选
+    if (folder !== 'all') {
+      filtered = notes.filter(note => {
+        const noteDir = note.relativePath.substring(0, note.relativePath.lastIndexOf('/'));
+        return noteDir === folder || noteDir.startsWith(folder + '/');
+      });
+    }
+    
+    // 再按搜索词筛选
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(note => 
+        note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        note.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        note.relativePath.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    setFilteredNotes(filtered);
+  };
+
   useEffect(() => {
     loadNotes();
+    loadFolders();
   }, []);
 
   if (loading) {
@@ -78,14 +121,35 @@ export default function NoteSearchPage() {
       {/* 搜索框 */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-4">Search Notes</h1>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by title, content, tags, or path..."
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="pl-10"
-          />
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by title, content, tags, or path..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          {/* 文件夹筛选 */}
+          <div className="flex items-center gap-2">
+            <Folder className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">筛选文件夹:</span>
+            <Select value={selectedFolder} onValueChange={handleFolderChange}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="选择文件夹" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">所有文件夹</SelectItem>
+                {folders.map((folder) => (
+                  <SelectItem key={folder} value={folder}>
+                    {folder || '根目录'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           Found {filteredNotes.length} notes

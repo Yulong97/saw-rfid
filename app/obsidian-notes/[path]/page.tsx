@@ -76,15 +76,38 @@ export default function NoteDetailPage() {
     }
   };
 
-  // 在外部应用中打开笔记
+  // 在Obsidian中打开笔记
   const openInExternalApp = () => {
     if (!note) return;
     
-    // 尝试用默认程序打开文件
-    const link = document.createElement('a');
-    link.href = `file:///${note.filePath.replace(/\\/g, '/')}`;
-    link.target = '_blank';
-    link.click();
+    try {
+      // 使用Obsidian的URL协议打开笔记
+      const obsidianUrl = `obsidian://open?vault=Obsidian_Yulong&file=${encodeURIComponent(note.relativePath)}`;
+      
+      // 尝试打开Obsidian
+      const obsidianWindow = window.open(obsidianUrl, '_blank');
+      
+      // 检查是否成功打开（如果Obsidian没有安装，window.open会失败）
+      if (!obsidianWindow || obsidianWindow.closed || typeof obsidianWindow.closed === 'undefined') {
+        // Obsidian可能没有安装，提供下载选项
+        const fallback = confirm('无法打开Obsidian应用。这可能是因为：\n1. Obsidian未安装\n2. 浏览器阻止了外部应用\n\n是否下载文件到本地？');
+        if (fallback) {
+          const link = document.createElement('a');
+          link.href = `/api/download?path=${encodeURIComponent(note.filePath)}`;
+          link.download = note.fileName;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      } else {
+        toast.success('正在打开Obsidian...');
+      }
+      
+    } catch (error) {
+      console.error('Error opening in Obsidian:', error);
+      toast.error('无法打开Obsidian应用');
+    }
   };
 
   // 处理图片路径转换
@@ -207,7 +230,7 @@ export default function NoteDetailPage() {
               </Button>
               <Button variant="outline" size="sm" onClick={openInExternalApp}>
                 <ExternalLink className="mr-2 h-4 w-4" />
-                Open
+                Open in Obsidian
               </Button>
             </div>
           </div>

@@ -13,26 +13,35 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const recordId = searchParams.get('id');
+    const filePath = searchParams.get('path');
 
-    if (!recordId) {
-      return NextResponse.json({ error: 'Record ID is required' }, { status: 400 });
+    let fullPath: string;
+    let fileName: string;
+
+    if (recordId) {
+      // 通过记录ID下载
+      const record = await prismaMain.data_management.findUnique({
+        where: { id: parseInt(recordId) },
+      });
+
+      if (!record) {
+        return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+      }
+
+      if (!record.file_path_relative) {
+        return NextResponse.json({ error: 'No file path associated with this record' }, { status: 404 });
+      }
+
+      // 构建完整文件路径
+      fullPath = path.join(RAW_DATA_FULL_PATH, record.file_path_relative.replace('test/', ''));
+      fileName = record.title || path.basename(fullPath);
+    } else if (filePath) {
+      // 通过文件路径下载
+      fullPath = decodeURIComponent(filePath);
+      fileName = path.basename(fullPath);
+    } else {
+      return NextResponse.json({ error: 'Record ID or file path is required' }, { status: 400 });
     }
-
-    // 获取记录信息
-    const record = await prismaMain.data_management.findUnique({
-      where: { id: parseInt(recordId) },
-    });
-
-    if (!record) {
-      return NextResponse.json({ error: 'Record not found' }, { status: 404 });
-    }
-
-    if (!record.file_path_relative) {
-      return NextResponse.json({ error: 'No file path associated with this record' }, { status: 404 });
-    }
-
-    // 构建完整文件路径
-    const fullPath = path.join(RAW_DATA_FULL_PATH, record.file_path_relative.replace('test/', ''));
     
     // 检查文件是否存在
     if (!fs.existsSync(fullPath)) {
@@ -72,7 +81,6 @@ export async function GET(request: NextRequest) {
     };
 
     const mimeType = mimeTypes[extension] || 'application/octet-stream';
-    const fileName = record.title || path.basename(fullPath);
 
     // 返回文件内容
     return new NextResponse(fileBuffer, {

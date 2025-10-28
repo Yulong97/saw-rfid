@@ -245,6 +245,103 @@ export async function getAllNotes(page: number = 1, pageSize: number = 20) {
   }
 }
 
+// Get all folders in the Obsidian vault
+export async function getAllFolders() {
+  try {
+    const folders = new Set<string>();
+    
+    function scanFolders(dir: string, baseDir: string = dir) {
+      try {
+        const files = fs.readdirSync(dir, { withFileTypes: true });
+        
+        for (const file of files) {
+          const fullPath = path.join(dir, file.name);
+          
+          // Skip hidden files and certain directories
+          if (file.name.startsWith('.') || 
+              file.name === 'node_modules' ||
+              file.name === '.obsidian' ||
+              file.name === '.trash') {
+            continue;
+          }
+          
+          if (file.isDirectory()) {
+            const relativePath = path.relative(baseDir, fullPath);
+            folders.add(relativePath.replace(/\\/g, '/'));
+            scanFolders(fullPath, baseDir);
+          }
+        }
+      } catch (error) {
+        console.error(`Error scanning directory ${dir}:`, error);
+      }
+    }
+    
+    scanFolders(OBSIDIAN_BASE_PATH);
+    
+    // Convert to array and sort
+    const folderList = Array.from(folders).sort();
+    
+    return {
+      success: true,
+      data: folderList,
+    };
+  } catch (error) {
+    console.error('Error getting folders:', error);
+    return { success: false, error: 'Failed to get folders' };
+  }
+}
+
+// Get notes filtered by folder
+export async function getNotesByFolder(folderPath: string, page: number = 1, pageSize: number = 20) {
+  try {
+    const markdownFiles = scanMarkdownFiles(OBSIDIAN_BASE_PATH);
+    let notes = markdownFiles
+      .map(file => parseMarkdownFile(file))
+      .filter((note): note is ObsidianNote => note !== null);
+    
+    // Filter notes by folder path
+    if (folderPath && folderPath !== 'all') {
+      notes = notes.filter(note => {
+        const noteDir = path.dirname(note.relativePath).replace(/\\/g, '/');
+        return noteDir === folderPath || noteDir.startsWith(folderPath + '/');
+      });
+    }
+    
+    // Sort by modification time
+    notes = notes.sort((a, b) => b.fileModified.getTime() - a.fileModified.getTime());
+    
+    // Calculate pagination
+    const totalCount = notes.length;
+    const totalPages = Math.ceil(totalCount / pageSize);
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedNotes = notes.slice(startIndex, endIndex);
+    
+    return {
+      success: true,
+      data: paginatedNotes,
+      pagination: {
+        currentPage: page,
+        pageSize,
+        totalCount,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      },
+      summary: {
+        total: totalCount,
+        scannedFiles: markdownFiles.length,
+        totalSize: notes.reduce((sum, note) => sum + note.size, 0),
+        totalWords: notes.reduce((sum, note) => sum + note.wordCount, 0),
+        folderPath: folderPath
+      }
+    };
+  } catch (error) {
+    console.error('Error getting notes by folder:', error);
+    return { success: false, error: 'Failed to get notes by folder' };
+  }
+}
+
 // Get note by relative path
 export async function getNoteByPath(relativePath: string) {
   try {

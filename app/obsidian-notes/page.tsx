@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { getAllNotes, getNoteByPath, searchNotes, type ObsidianNote } from '@/actions/main/obsidian-actions';
+import { getAllNotes, getNoteByPath, searchNotes, getAllFolders, getNotesByFolder, type ObsidianNote } from '@/actions/main/obsidian-actions';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { FileText, RefreshCw, Clock, Hash, HardDrive, Eye, ExternalLink, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, RefreshCw, Clock, Hash, HardDrive, Eye, ExternalLink, Search, X, ChevronLeft, ChevronRight, Folder } from 'lucide-react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -32,15 +32,34 @@ export default function ObsidianNotesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [pagination, setPagination] = useState<any>(null);
+  const [folders, setFolders] = useState<string[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState('all');
   const isInitialized = useRef(false);
   const lastUrlParams = useRef('');
 
+  // Load folders
+  const loadFolders = async () => {
+    try {
+      const result = await getAllFolders();
+      if (result.success && result.data) {
+        setFolders(result.data);
+      }
+    } catch (error) {
+      console.error('Error loading folders:', error);
+    }
+  };
+
   // Load notes without URL update (for initial load from URL)
-  const loadNotesWithoutUrlUpdate = async (page: number = currentPage, size: number = pageSize) => {
+  const loadNotesWithoutUrlUpdate = async (page: number = currentPage, size: number = pageSize, folder: string = selectedFolder) => {
     setLoading(true);
     
     try {
-      const result = await getAllNotes(page, size);
+      let result;
+      if (folder === 'all') {
+        result = await getAllNotes(page, size);
+      } else {
+        result = await getNotesByFolder(folder, page, size);
+      }
       
       if (result.success) {
         setNotes(result.data || []);
@@ -87,11 +106,16 @@ export default function ObsidianNotesPage() {
   };
 
   // Load notes
-  const loadNotes = async (page: number = currentPage, size: number = pageSize) => {
+  const loadNotes = async (page: number = currentPage, size: number = pageSize, folder: string = selectedFolder) => {
     setLoading(true);
     
     try {
-      const result = await getAllNotes(page, size);
+      let result;
+      if (folder === 'all') {
+        result = await getAllNotes(page, size);
+      } else {
+        result = await getNotesByFolder(folder, page, size);
+      }
       
       if (result.success) {
         setNotes(result.data || []);
@@ -165,8 +189,20 @@ export default function ObsidianNotesPage() {
     if (searchQuery.trim()) {
       handleSearch(searchQuery, 1);
     } else {
-      loadNotes(1, newPageSize);
-      updateUrl('', 1, newPageSize);
+      loadNotes(1, newPageSize, selectedFolder);
+      updateUrl('', 1, newPageSize, selectedFolder);
+    }
+  };
+
+  // Handle folder change
+  const handleFolderChange = (folder: string) => {
+    setSelectedFolder(folder);
+    setCurrentPage(1);
+    if (searchQuery.trim()) {
+      handleSearch(searchQuery, 1);
+    } else {
+      loadNotes(1, pageSize, folder);
+      updateUrl('', 1, pageSize, folder);
     }
   };
 
@@ -175,7 +211,8 @@ export default function ObsidianNotesPage() {
     const urlQuery = searchParams.get('q') || '';
     const urlPage = parseInt(searchParams.get('page') || '1');
     const urlPageSize = parseInt(searchParams.get('pageSize') || '20');
-    const currentUrlParams = `${urlQuery}-${urlPage}-${urlPageSize}`;
+    const urlFolder = searchParams.get('folder') || 'all';
+    const currentUrlParams = `${urlQuery}-${urlPage}-${urlPageSize}-${urlFolder}`;
     
     // 初始化或URL参数改变时执行
     if (!isInitialized.current || lastUrlParams.current !== currentUrlParams) {
@@ -185,6 +222,7 @@ export default function ObsidianNotesPage() {
       setSearchQuery(urlQuery);
       setCurrentPage(urlPage);
       setPageSize(urlPageSize);
+      setSelectedFolder(urlFolder);
       
       // 加载数据
       const loadData = async () => {
@@ -193,8 +231,10 @@ export default function ObsidianNotesPage() {
           let result;
           if (urlQuery.trim()) {
             result = await searchNotes(urlQuery, urlPage, urlPageSize);
-          } else {
+          } else if (urlFolder === 'all') {
             result = await getAllNotes(urlPage, urlPageSize);
+          } else {
+            result = await getNotesByFolder(urlFolder, urlPage, urlPageSize);
           }
           
           if (result.success) {
@@ -216,12 +256,18 @@ export default function ObsidianNotesPage() {
     }
   }, [searchParams]);
 
+  // 初始化时加载文件夹列表
+  useEffect(() => {
+    loadFolders();
+  }, []);
+
   // 更新URL参数
-  const updateUrl = (query: string, page: number, size: number) => {
+  const updateUrl = (query: string, page: number, size: number, folder: string = selectedFolder) => {
     const params = new URLSearchParams();
     if (query.trim()) params.set('q', query);
     if (page > 1) params.set('page', page.toString());
     if (size !== 20) params.set('pageSize', size.toString());
+    if (folder !== 'all') params.set('folder', folder);
     
     const newUrl = params.toString() ? `/obsidian-notes?${params.toString()}` : '/obsidian-notes';
     router.replace(newUrl, { scroll: false });
@@ -251,7 +297,7 @@ export default function ObsidianNotesPage() {
       {/* Search Bar */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-2">
+          <div className="flex gap-2 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
@@ -286,9 +332,34 @@ export default function ObsidianNotesPage() {
               </Button>
             )}
           </div>
+          
+          {/* 文件夹筛选 */}
+          <div className="flex items-center gap-2">
+            <Folder className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">筛选文件夹:</span>
+            <Select value={selectedFolder} onValueChange={handleFolderChange}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="选择文件夹" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">所有文件夹</SelectItem>
+                {folders.map((folder) => (
+                  <SelectItem key={folder} value={folder}>
+                    {folder || '根目录'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
           {summary?.searchQuery && (
             <div className="mt-2 text-sm text-muted-foreground">
               搜索结果: "{summary.searchQuery}" - 找到 {summary.total} 个笔记
+            </div>
+          )}
+          {summary?.folderPath && summary.folderPath !== 'all' && !summary?.searchQuery && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              文件夹筛选: "{summary.folderPath}" - 找到 {summary.total} 个笔记
             </div>
           )}
         </CardContent>
