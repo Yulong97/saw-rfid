@@ -4,7 +4,8 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../../node_modules/@prisma/client-main"
+  // 生成到项目目录，避免 npm install 新依赖时清理 node_modules 导致客户端丢失
+  output   = "../../lib/generated/client-main"
 }
 
 datasource db {

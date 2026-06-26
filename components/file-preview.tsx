@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,9 +24,22 @@ import {
   X,
   Loader2,
   AlertCircle,
-  FileIcon
+  FileIcon,
+  Maximize2,
+  ExternalLink,
+  PenTool,
 } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
+
+const DxfPreview = dynamic(() => import('@/components/dxf-preview'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[70vh] items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin" />
+    </div>
+  ),
+});
 
 interface FilePreviewProps {
   recordId: number;
@@ -156,6 +170,8 @@ export default function FilePreview({ recordId, fileName, isOpen, onClose }: Fil
         return <Code className="h-6 w-6" />;
       case 'pdf':
         return <FileText className="h-6 w-6" />;
+      case 'dxf':
+        return <PenTool className="h-6 w-6" />;
       default:
         return <FileIcon className="h-6 w-6" />;
     }
@@ -246,7 +262,7 @@ export default function FilePreview({ recordId, fileName, isOpen, onClose }: Fil
             <img 
               src={fileContent.content.content} 
               alt={fileContent.fileName}
-              className="max-w-full max-h-96 object-contain rounded border"
+              className="max-w-full max-h-[70vh] object-contain rounded border"
             />
           </div>
         );
@@ -254,19 +270,28 @@ export default function FilePreview({ recordId, fileName, isOpen, onClose }: Fil
       case 'pdf':
         return (
           <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              PDF文件预览 (大小: {formatFileSize(fileContent.content.size)})
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>PDF Preview ({formatFileSize(fileContent.content.size)})</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/data-management/view?id=${recordId}`} target="_blank">
+                    <Maximize2 className="h-4 w-4 mr-1" />
+                    Full Screen
+                  </Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={fileContent.content.content} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    New Tab
+                  </a>
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-center">
-              <iframe
-                src={fileContent.content.content}
-                className="w-full h-96 border rounded"
-                title={fileContent.fileName}
-              />
-            </div>
-            <div className="text-center text-sm text-muted-foreground">
-              如果PDF无法显示，请点击下载按钮下载文件
-            </div>
+            <iframe
+              src={fileContent.content.content}
+              className="w-full min-h-[70vh] border rounded bg-muted"
+              title={fileContent.fileName}
+            />
           </div>
         );
 
@@ -330,6 +355,19 @@ export default function FilePreview({ recordId, fileName, isOpen, onClose }: Fil
           </div>
         );
 
+      case 'dxf':
+        return (
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              DXF Preview ({formatFileSize(fileContent.content.size)})
+            </div>
+            <DxfPreview
+              streamUrl={fileContent.content.content}
+              fileName={fileContent.fileName}
+            />
+          </div>
+        );
+
       default:
         return (
           <div className="flex items-center justify-center h-32 text-muted-foreground">
@@ -342,19 +380,64 @@ export default function FilePreview({ recordId, fileName, isOpen, onClose }: Fil
 
   useEffect(() => {
     if (isOpen && recordId) {
+      setFileInfo(null);
+      setFileContent(null);
+      setActiveTab('info');
       fetchFileInfo();
     }
   }, [isOpen, recordId]);
 
   useEffect(() => {
+    if (fileInfo?.fileType === 'pdf' && fileInfo.isPreviewable) {
+      setActiveTab('content');
+    }
+    if (
+      (fileInfo?.fileType === 'image' ||
+        fileInfo?.fileType === 'video' ||
+        fileInfo?.fileType === 'dxf') &&
+      fileInfo.isPreviewable
+    ) {
+      setActiveTab('content');
+    }
+  }, [fileInfo]);
+
+  useEffect(() => {
     if (activeTab === 'content' && fileInfo?.isPreviewable && !fileContent) {
+      if (
+        fileInfo.fileType === 'pdf' ||
+        fileInfo.fileType === 'image' ||
+        fileInfo.fileType === 'video' ||
+        fileInfo.fileType === 'dxf'
+      ) {
+        setFileContent({
+          fileName: fileInfo.fileName,
+          fileType: fileInfo.fileType,
+          extension: fileInfo.extension,
+          content: {
+            type: fileInfo.fileType,
+            content: `/api/stream?id=${recordId}`,
+            size: fileInfo.fileSize,
+            fileName: fileInfo.fileName,
+            mimeType: fileInfo.mimeType,
+          },
+          mimeType: fileInfo.mimeType,
+        });
+        return;
+      }
       fetchFileContent();
     }
-  }, [activeTab, fileInfo]);
+  }, [activeTab, fileInfo, fileContent, recordId]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent className={
+        fileInfo?.fileType === 'pdf' ||
+        fileInfo?.fileType === 'image' ||
+        fileInfo?.fileType === 'video' ||
+        fileInfo?.fileType === 'dxf'
+          ? 'max-w-6xl max-h-[95vh]'
+          : 'max-w-4xl max-h-[90vh]'
+      }>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {fileInfo && getFileIcon(fileInfo.fileType)}
@@ -450,6 +533,9 @@ export default function FilePreview({ recordId, fileName, isOpen, onClose }: Fil
 
             <TabsContent value="content" className="space-y-4">
               {fileContent ? (
+                fileContent.fileType === 'dxf' ? (
+                  renderFileContent()
+                ) : (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">内容预览</CardTitle>
@@ -458,6 +544,7 @@ export default function FilePreview({ recordId, fileName, isOpen, onClose }: Fil
                     {renderFileContent()}
                   </CardContent>
                 </Card>
+                )
               ) : (
                 <div className="flex items-center justify-center py-8 text-muted-foreground">
                   <AlertCircle className="h-8 w-8 mr-2" />

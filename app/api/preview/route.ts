@@ -16,6 +16,7 @@ const PREVIEWABLE_TYPES = {
   video: ['.mp4', '.avi', '.mov', '.webm'],
   audio: ['.mp3', '.wav', '.ogg', '.m4a'],
   pdf: ['.pdf'],
+  dxf: ['.dxf'],
   code: ['.js', '.ts', '.jsx', '.tsx', '.css', '.scss', '.html', '.py', '.java', '.cpp', '.c', '.php', '.rb', '.go', '.rs']
 };
 
@@ -132,13 +133,13 @@ async function getFileContent(filePath: string, fileType: string, extension: str
         };
 
       case 'image':
-        // 对于图片，返回base64编码
-        const imageBuffer = fs.readFileSync(filePath);
-        const base64Image = imageBuffer.toString('base64');
+        // 图片通过流式 API 预览，避免大文件 base64 导致响应过大
         return {
           type: 'image',
-          content: `data:${getMimeType(extension)};base64,${base64Image}`,
-          size: imageBuffer.length
+          content: `/api/stream?id=${recordId}`,
+          size: fs.statSync(filePath).size,
+          fileName: path.basename(filePath),
+          mimeType: getMimeType(extension)
         };
 
       case 'json':
@@ -166,14 +167,13 @@ async function getFileContent(filePath: string, fileType: string, extension: str
         };
 
       case 'pdf':
-        // 对于PDF文件，返回base64编码用于预览
-        const pdfBuffer = fs.readFileSync(filePath);
-        const base64Pdf = pdfBuffer.toString('base64');
+        // PDF 通过流式 API 预览，避免大文件 base64 导致响应过大
         return {
           type: 'pdf',
-          content: `data:${getMimeType(extension)};base64,${base64Pdf}`,
-          size: pdfBuffer.length,
-          fileName: path.basename(filePath)
+          content: `/api/stream?id=${recordId}`,
+          size: fs.statSync(filePath).size,
+          fileName: path.basename(filePath),
+          mimeType: getMimeType(extension)
         };
 
       case 'video':
@@ -190,6 +190,16 @@ async function getFileContent(filePath: string, fileType: string, extension: str
         // 对于音频文件，返回流式API URL用于预览
         return {
           type: 'audio',
+          content: `/api/stream?id=${recordId}`,
+          size: fs.statSync(filePath).size,
+          fileName: path.basename(filePath),
+          mimeType: getMimeType(extension)
+        };
+
+      case 'dxf':
+        // DXF 通过流式 API 加载，由前端 WebGL 渲染
+        return {
+          type: 'dxf',
           content: `/api/stream?id=${recordId}`,
           size: fs.statSync(filePath).size,
           fileName: path.basename(filePath),
@@ -223,6 +233,7 @@ function getMimeType(extension: string): string {
     '.log': 'text/plain',
     '.md': 'text/markdown',
     '.pdf': 'application/pdf',
+    '.dxf': 'application/dxf',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',

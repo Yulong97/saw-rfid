@@ -118,25 +118,62 @@ export default function NoteDetailPage() {
     // 获取笔记文件所在的目录
     const noteDir = note.relativePath.substring(0, note.relativePath.lastIndexOf('/'));
     
+    // 处理相对路径的函数
+    const resolveRelativePath = (imagePath: string) => {
+      // 如果已经是绝对路径或完整URL，直接返回
+      if (imagePath.startsWith('http') || imagePath.startsWith('/api/')) {
+        return imagePath;
+      }
+      
+      // 处理相对路径 (../ 或 ./)
+      if (imagePath.startsWith('./') || imagePath.startsWith('../')) {
+        // 手动处理相对路径，避免在客户端使用 Node.js 的 path 模块
+        const noteDirParts = noteDir.split('/').filter(part => part.length > 0);
+        const imagePathParts = imagePath.split('/').filter(part => part.length > 0);
+        
+        let resultParts = [...noteDirParts];
+        
+        for (const part of imagePathParts) {
+          if (part === '..') {
+            // 向上一级目录
+            if (resultParts.length > 0) {
+              resultParts.pop();
+            }
+          } else if (part === '.') {
+            // 当前目录，不做任何操作
+            continue;
+          } else {
+            // 添加路径部分
+            resultParts.push(part);
+          }
+        }
+        
+        return resultParts.join('/');
+      }
+      
+      // 如果图片路径不包含文件夹分隔符，尝试在笔记同级目录的assets文件夹中查找
+      if (!imagePath.includes('/') && !imagePath.includes('\\')) {
+        return `${noteDir}/assets/${imagePath}`;
+      }
+      
+      // 如果路径包含文件夹分隔符但不是相对路径，直接使用
+      return imagePath;
+    };
+    
     // 处理 Obsidian 图片链接格式
     // 支持 ![[image.png]] 和 ![alt](path) 格式
     return content
       .replace(/!\[\[([^\]]+)\]\]/g, (match, imagePath) => {
         // 处理 ![[image.png]] 格式
-        let finalPath = imagePath;
-        
-        if (!imagePath.includes('/') && !imagePath.includes('\\')) {
-          // 如果图片路径不包含文件夹，尝试在笔记同级目录的assets文件夹中查找
-          finalPath = `${noteDir}/assets/${imagePath}`;
-        }
-        
+        const finalPath = resolveRelativePath(imagePath);
         const encodedPath = encodeURIComponent(finalPath);
         return `![${imagePath}](/api/obsidian-image?path=${encodedPath})`;
       })
       .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, imagePath) => {
         // 处理 ![alt](path) 格式，如果路径不是完整URL
         if (!imagePath.startsWith('http') && !imagePath.startsWith('/api/')) {
-          const encodedPath = encodeURIComponent(imagePath);
+          const finalPath = resolveRelativePath(imagePath);
+          const encodedPath = encodeURIComponent(finalPath);
           return `![${alt}](/api/obsidian-image?path=${encodedPath})`;
         }
         return match;
@@ -310,7 +347,7 @@ export default function NoteDetailPage() {
                   <img
                     src={src}
                     alt={alt}
-                    className="max-w-full h-auto rounded-lg shadow-sm"
+                    className="max-w-full h-auto block mx-auto my-4"
                     {...props}
                   />
                 ),

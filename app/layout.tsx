@@ -32,7 +32,7 @@ export default function RootLayout({
         <div className="flex h-screen">
           <SidebarProvider>
             <AppSidebar />
-            <main className="flex-1 overflow-auto">
+            <main className="flex-1">
               <div className="container mx-auto max-w-8xl px-4 sm:px-6 lg:px-7">
                 <div className="py-4">
                   <SidebarTrigger />

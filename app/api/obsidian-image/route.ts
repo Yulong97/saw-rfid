@@ -17,11 +17,21 @@ export async function GET(request: NextRequest) {
     // 解码路径
     const decodedPath = decodeURIComponent(imagePath);
     
+    // 处理相对路径和绝对路径
+    let normalizedPath = decodedPath;
+    
+    // 如果路径以 / 开头，去掉开头的斜杠
+    if (normalizedPath.startsWith('/')) {
+      normalizedPath = normalizedPath.substring(1);
+    }
+    
+    // 构建完整的文件路径
+    const fullPath = path.join(OBSIDIAN_BASE_PATH, normalizedPath);
+    
     // 尝试多个可能的路径
     const possiblePaths = [
-      path.join(OBSIDIAN_BASE_PATH, decodedPath),
-      // 如果路径包含文件夹分隔符，说明已经是完整路径
-      // 如果不包含，尝试在assets文件夹中查找
+      fullPath,
+      // 如果路径不包含文件夹分隔符，尝试在assets文件夹中查找
       ...(decodedPath.includes('/') ? [] : [
         path.join(OBSIDIAN_BASE_PATH, 'assets', decodedPath),
       ]),

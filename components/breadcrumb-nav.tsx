@@ -60,6 +60,12 @@ export const breadcrumbConfigs = {
     { label: '数据管理', href: '/data-management', icon: Database },
     { label: '文件管理' }
   ],
+  pdfViewer: (fileName: string) => [
+    { label: '主页', href: '/', icon: Home },
+    { label: '数据管理', href: '/data-management', icon: Database },
+    { label: '文件管理', href: '/data-management', icon: FileText },
+    { label: fileName }
+  ],
   obsidianNotes: [
     { label: '主页', href: '/', icon: Home },
     { label: '笔记管理', href: '/obsidian-notes', icon: StickyNote },

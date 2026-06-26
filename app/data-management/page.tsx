@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getDataManagementRecords,
   scanAndSyncDataFiles,
@@ -56,10 +56,30 @@ import {
   X,
   CheckSquare,
   Square,
-  FileSearch
+  FileSearch,
+  FileText as FileTextIcon,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  Music,
+  FileCode,
+  PenTool,
+  LayoutGrid,
+  LayoutList,
+  ArrowUpDown,
 } from 'lucide-react';
+import Link from 'next/link';
 import FilePreview from '@/components/file-preview';
+import FileInlinePreview from '@/components/file-inline-preview';
 import { BreadcrumbNav, breadcrumbConfigs } from '@/components/breadcrumb-nav';
+import {
+  type FileCategory,
+  type SortOption,
+  FILE_CATEGORY_LABELS,
+  matchesCategory,
+  sortRecords,
+  countByCategory,
+  getFileCategory,
+} from '@/lib/file-types';
 
 interface DataManagementRecord {
   id: number;
@@ -103,6 +123,36 @@ export default function DataManagementPage() {
   // 同步状态
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncMode, setSyncMode] = useState<'full' | 'incremental'>('incremental');
+
+  // 分类筛选与排序
+  const [categoryFilter, setCategoryFilter] = useState<FileCategory>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('updatedDesc');
+  const [layoutMode, setLayoutMode] = useState<'list' | 'grid'>('list');
+
+  const categoryCounts = useMemo(() => countByCategory(records), [records]);
+
+  const displayedRecords = useMemo(() => {
+    const filtered = records.filter((record) =>
+      matchesCategory(categoryFilter, record.file_path_relative, record.title)
+    );
+    return sortRecords(filtered, sortBy);
+  }, [records, categoryFilter, sortBy]);
+
+  const useGridLayout =
+    layoutMode === 'grid' &&
+    (categoryFilter === 'image' || categoryFilter === 'video');
+
+  const CATEGORY_OPTIONS: { value: FileCategory; icon: typeof FileText }[] = [
+    { value: 'all', icon: FileText },
+    { value: 'image', icon: ImageIcon },
+    { value: 'video', icon: VideoIcon },
+    { value: 'pdf', icon: FileTextIcon },
+    { value: 'audio', icon: Music },
+    { value: 'text', icon: FileText },
+    { value: 'code', icon: FileCode },
+    { value: 'dxf', icon: PenTool },
+    { value: 'other', icon: FileText },
+  ];
 
   // 加载数据
   const loadData = async () => {
@@ -242,6 +292,10 @@ export default function DataManagementPage() {
     setPreviewRecord(null);
   };
 
+  const isPdfFile = (record: DataManagementRecord): boolean => {
+    return getFileCategory(record.file_path_relative, record.title) === 'pdf';
+  };
+
   // 处理文件选择
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -330,14 +384,21 @@ export default function DataManagementPage() {
     );
   };
 
-  // 全选/取消全选
+  // 全选/取消全选（仅当前筛选结果）
   const toggleSelectAll = () => {
-    if (selectedRecords.length === records.length) {
-      setSelectedRecords([]);
+    const displayedIds = displayedRecords.map((record) => record.id);
+    const allSelected = displayedIds.every((id) => selectedRecords.includes(id));
+
+    if (allSelected) {
+      setSelectedRecords((prev) => prev.filter((id) => !displayedIds.includes(id)));
     } else {
-      setSelectedRecords(records.map(record => record.id));
+      setSelectedRecords((prev) => [...new Set([...prev, ...displayedIds])]);
     }
   };
+
+  const isAllDisplayedSelected =
+    displayedRecords.length > 0 &&
+    displayedRecords.every((record) => selectedRecords.includes(record.id));
 
   // 下载单个文件
   const handleDownloadSingle = async (recordId: number) => {
@@ -680,6 +741,87 @@ export default function DataManagementPage() {
           </Card>
         ) : (
           <>
+            {/* 分类筛选与排序 */}
+            <div className="space-y-3 p-4 bg-muted rounded-lg">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium mr-1">Category:</span>
+                {CATEGORY_OPTIONS.map(({ value, icon: Icon }) => {
+                  const count = categoryCounts[value];
+                  if (value !== 'all' && count === 0) return null;
+
+                  return (
+                    <Button
+                      key={value}
+                      variant={categoryFilter === value ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setCategoryFilter(value);
+                        if (value !== 'image' && value !== 'video') {
+                          setLayoutMode('list');
+                        }
+                      }}
+                      className="gap-1.5"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {FILE_CATEGORY_LABELS[value]}
+                      <Badge
+                        variant={categoryFilter === value ? 'secondary' : 'outline'}
+                        className="ml-0.5 h-5 min-w-5 px-1"
+                      >
+                        {count}
+                      </Badge>
+                    </Button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                  <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
+                    <SelectTrigger className="w-44 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="updatedDesc">Updated (newest)</SelectItem>
+                      <SelectItem value="updatedAsc">Updated (oldest)</SelectItem>
+                      <SelectItem value="createdDesc">Created (newest)</SelectItem>
+                      <SelectItem value="createdAsc">Created (oldest)</SelectItem>
+                      <SelectItem value="titleAsc">Name (A-Z)</SelectItem>
+                      <SelectItem value="titleDesc">Name (Z-A)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {(categoryFilter === 'image' || categoryFilter === 'video') && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant={layoutMode === 'list' ? 'default' : 'outline'}
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setLayoutMode('list')}
+                      title="List view"
+                    >
+                      <LayoutList className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={layoutMode === 'grid' ? 'default' : 'outline'}
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setLayoutMode('grid')}
+                      title="Grid view"
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                <span className="text-sm text-muted-foreground">
+                  Showing {displayedRecords.length} / {records.length}
+                </span>
+              </div>
+            </div>
+
             {/* 全选按钮 */}
             <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
               <Button
@@ -687,29 +829,39 @@ export default function DataManagementPage() {
                 size="sm"
                 onClick={toggleSelectAll}
                 className="flex items-center gap-2"
+                disabled={displayedRecords.length === 0}
               >
-                {selectedRecords.length === records.length ? (
+                {isAllDisplayedSelected ? (
                   <CheckSquare className="h-4 w-4" />
                 ) : (
                   <Square className="h-4 w-4" />
                 )}
-                {selectedRecords.length === records.length ? '取消全选' : '全选'}
+                {isAllDisplayedSelected ? 'Deselect all' : 'Select all'}
               </Button>
               <span className="text-sm text-muted-foreground">
-                已选择 {selectedRecords.length} / {records.length} 个文件
+                Selected {selectedRecords.length} / {displayedRecords.length} shown ({records.length} total)
               </span>
             </div>
 
-            {records.map((record) => (
+            {displayedRecords.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No files in this category</p>
+                </CardContent>
+              </Card>
+            ) : (
+            <div className={useGridLayout ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' : 'space-y-4'}>
+            {displayedRecords.map((record) => (
               <Card key={record.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
+                <CardHeader className={useGridLayout ? 'pb-3' : undefined}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3 min-w-0">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => toggleRecordSelection(record.id)}
-                        className="h-6 w-6 p-0"
+                        className="h-6 w-6 p-0 shrink-0"
                       >
                         {selectedRecords.includes(record.id) ? (
                           <CheckSquare className="h-4 w-4 text-primary" />
@@ -717,14 +869,28 @@ export default function DataManagementPage() {
                           <Square className="h-4 w-4" />
                         )}
                       </Button>
-                      <div className="space-y-1">
-                        <CardTitle className="text-lg">{record.title}</CardTitle>
-                        <CardDescription>
-                          ID: {record.id} | 状态: {record.status}
+                      <div className="space-y-1 min-w-0">
+                        <CardTitle className={`${useGridLayout ? 'text-base' : 'text-lg'} truncate`}>
+                          {record.title}
+                        </CardTitle>
+                        <CardDescription className="truncate">
+                          ID: {record.id} | {record.status}
                         </CardDescription>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+                      {record.file_path_relative && isPdfFile(record) && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          asChild
+                          title="Browse PDF"
+                        >
+                          <Link href={`/data-management/view?id=${record.id}`} target="_blank">
+                            <FileTextIcon className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      )}
                       {record.file_path_relative && (
                         <Button
                           variant="outline"
@@ -776,7 +942,16 @@ export default function DataManagementPage() {
                   </div>
                 </CardHeader>
               <CardContent>
-                <div className="space-y-2">
+                <div className="space-y-3">
+                  {record.file_path_relative && (
+                    <FileInlinePreview
+                      recordId={record.id}
+                      filePath={record.file_path_relative}
+                      title={record.title}
+                    />
+                  )}
+                  {!useGridLayout && (
+                    <>
                   <p className="text-sm">
                     <span className="font-medium">描述:</span>{' '}
                     {record.description || '无'}
@@ -784,24 +959,33 @@ export default function DataManagementPage() {
                   {record.file_path_relative && (
                     <p className="text-sm">
                       <span className="font-medium">文件路径:</span>{' '}
-                      <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                      <code className="bg-muted px-1 py-0.5 rounded text-xs break-all">
                         {record.file_path_relative}
                       </code>
                     </p>
                   )}
-                  <div className="flex items-center gap-2">
+                    </>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline">
+                      {FILE_CATEGORY_LABELS[getFileCategory(record.file_path_relative, record.title)]}
+                    </Badge>
                     <Badge variant={record.status === 'active' ? 'default' : 'secondary'}>
                       {record.status}
                     </Badge>
+                    {!useGridLayout && (
                     <span className="text-xs text-muted-foreground">
                       创建: {new Date(record.createdAt).toLocaleDateString()} | 
                       更新: {new Date(record.updatedAt).toLocaleDateString()}
                     </span>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
             ))}
+            </div>
+            )}
           </>
         )}
       </div>

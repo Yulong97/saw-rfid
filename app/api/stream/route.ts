@@ -57,13 +57,17 @@ export async function GET(request: NextRequest) {
       const file = fs.createReadStream(fullPath, { start, end });
       
       // 设置响应头
-      const headers = {
+      const headers: Record<string, string> = {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
         'Content-Length': chunksize.toString(),
         'Content-Type': getMimeType(path.extname(fullPath)),
         'Cache-Control': 'public, max-age=31536000',
       };
+
+      if (path.extname(fullPath).toLowerCase() === '.pdf') {
+        headers['Content-Disposition'] = `inline; filename="${encodeURIComponent(fileName)}"`;
+      }
 
       return new NextResponse(file as any, {
         status: 206, // Partial Content
@@ -72,16 +76,23 @@ export async function GET(request: NextRequest) {
     } else {
       // 没有Range请求，返回完整文件
       const fileBuffer = fs.readFileSync(fullPath);
-      const mimeType = getMimeType(path.extname(fullPath));
+      const extension = path.extname(fullPath);
+      const mimeType = getMimeType(extension);
+      const headers: Record<string, string> = {
+        'Content-Type': mimeType,
+        'Content-Length': fileSize.toString(),
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'public, max-age=31536000',
+      };
+
+      // PDF 使用 inline 以便浏览器内嵌预览
+      if (extension.toLowerCase() === '.pdf') {
+        headers['Content-Disposition'] = `inline; filename="${encodeURIComponent(fileName)}"`;
+      }
 
       return new NextResponse(fileBuffer, {
         status: 200,
-        headers: {
-          'Content-Type': mimeType,
-          'Content-Length': fileSize.toString(),
-          'Accept-Ranges': 'bytes',
-          'Cache-Control': 'public, max-age=31536000',
-        },
+        headers,
       });
     }
   } catch (error) {
@@ -102,6 +113,7 @@ function getMimeType(extension: string): string {
     '.ogg': 'audio/ogg',
     '.m4a': 'audio/mp4',
     '.pdf': 'application/pdf',
+    '.dxf': 'application/dxf',
     '.txt': 'text/plain',
     '.csv': 'text/csv',
     '.json': 'application/json',
